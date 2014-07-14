@@ -2,9 +2,9 @@ var domain = require('domain');
 var net = require('net');
 var once = require('once');
 var async = require('async');
+var dns = require('dns');
 
-
-var TIMEOUT;
+var TIMEOUT = 10000;
 
 var askers = [
 	require('./lib/askers/1_7'),
@@ -31,33 +31,51 @@ exports.getStatus = function(addr, port, opts, cb) {
 		opts = {};
 	}
 
-	TIMEOUT = opts['timeout'] != null ? opts['timeout'] : 1000;
+    TIMEOUT = opts['timeout'] != null ? opts['timeout'] : 1000;
+    port = port != null ? port : 25565;
 
 	cb = once(cb);
 	addr = addr.trim();
 
-	var a = askers.slice(), lastError;
-	if(opts.asker) {
-		a = [askerLookup[opts.asker]];
-	}
+    async.series([
+        function(callback) {
+            //verify if its ip, otherwise get the ip if its a domain
+            if(!new RegExp( '^\d+\.\d+\.\d+\.\d+$').test(addr)) {
+                dns.lookup(addr, function(error, ip){
+                    addr = ip;
+                    callback(null, 1);
+                });
+            } else {
+                callback(null, 1);
+            }
+        },
+        function(callback) {
+            var a = askers.slice(), lastError;
+            if(opts.asker) {
+                a = [askerLookup[opts.asker]];
+            }
 
-	async.until(function() {
-		return a.length === 0;
-	}, function(cb) {
-		attempt(a.pop(), addr, port, function(err, info) {
-			if(err) {
-				lastError = err;
-			}
+            async.until(function() {
+                return a.length === 0;
+            }, function(cb) {
+                attempt(a.pop(), addr, port, function(err, info) {
+                    if(err) {
+                        lastError = err;
+                    }
 
-			cb(info);
-		});
-	}, function(info) {
-		if(info) {
-			cb(null, info);
-		} else {
-			cb(new Error('Unable to get server info: ' + lastError.message));
-		}
-	});
+                    cb(info);
+                    callback(null, 2);
+                });
+            }, function(info) {
+                if(info) {
+                    cb(null, info);
+                } else {
+                    cb(new Error('Unable to get server info: ' + lastError.message));
+                }
+                callback(null, 2);
+            });
+        }
+    ])
 }
 
 
