@@ -4,7 +4,7 @@ var once = require('once');
 var async = require('async');
 
 
-var TIMEOUT = 10 * 1000;
+var TIMEOUT;
 
 var askers = [
 	require('./lib/askers/1_7'),
@@ -30,6 +30,8 @@ exports.getStatus = function(addr, port, opts, cb) {
 		cb = opts;
 		opts = {};
 	}
+
+	TIMEOUT = opts['timeout'] != null ? opts['timeout'] : 1000;
 
 	cb = once(cb);
 	addr = addr.trim();
